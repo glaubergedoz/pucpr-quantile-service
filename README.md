@@ -103,6 +103,7 @@ message QuantileResponse {
 - **`com.tdunning/t-digest`** for TDigest  
 - **`com.clearspring.analytics/stream`** for Count‑Min Sketch  
 - **`clojure.tools.build`** (`build.clj`) for compiling stubs, Clojure code, and generating an uberjar  
+- **REPL helpers** in `dev/user.clj` (`start!`, `stop!`, `restart!`)  
 - **Error logging** via `clojure.spec/explain-str` in case of invalid samples  
 
 ## 9. Usage Instructions
