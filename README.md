@@ -106,214 +106,155 @@ message QuantileResponse {
 - **REPL helpers** in `dev/user.clj` (`start!`, `stop!`, `restart!`)  
 - **Error logging** via `clojure.spec/explain-str` in case of invalid samples  
 
+
+
+
+
+
+
 ## 9. Usage Instructions
 
-### 9.1. System Requirements
+### System Requirements
 
-- **Java** JDK 11 or newer  
-- **Clojure CLI** tools (`clj` / `clojure`)  
-- **protoc** (Protocol Buffer compiler) ≥ 3.x, with the gRPC Java plugin installed  
-- A Unix‑like shell (Linux, macOS, WSL) or PowerShell on Windows  
+- **Docker Engine**
+- **Docker Compose**
 - `git` (optional, for cloning the repo)
 
-### 9.2. Development Environment Setup
+### Development Environment Setup
 
-1. **Clone the repo** (or unpack your project folder):
+- **Clone the repo** (or unpack the project folder).
+    ```bash
+    git clone https://your‑repo/pucpr-quantile‑service.git
+    cd pucpr-quantile‑service
+    ```
+- **Build** the dev container.
+    ```bash
+    docker compose build --no-cache dev
+    ```
+- **Run** the container in dev mode.
+    ```bash
+    dock compose run -i --service-ports dev
+    ```
+- **Start** the service:
+    At `user=>`:
+    ```bash
+    (start!)
+    ```
+    You should see:
+    ```bash
+    [mount] Starting ingest loop
+    [mount] Starting HTTP server on port 8080
+    [mount] Starting gRPC server on port 50051
+    Quantile service running on HTTP:8080 and gRPC:50051
+    ```
+    **That's it!**   
+    The endpoints should be available on ports 8080 (HTTP) e 50051 (gRPC).
 
-   ```bash
-   git clone https://your‑repo/quantile‑service.git
-   cd quantile‑service
-   ```
+- **Test the HTTP** endpoints.  
+    
+    Ingest a sample:
+    ```bash
+    TIMESTAMP_MS=$(($(date +%s)*1000))
+    ```
+    ```bash
+    curl -i -X POST http://localhost:8080/samples \
+            -H 'Content-Type: application/json' \
+            -d '{
+                "key": "foo",
+                "value": 42.0,
+                "timestamp": '"$TIMESTAMP"'
+            }'
+    ```
 
-2. **Generate Java/gRPC stubs** from the `.proto` file:
-
-   ```bash
-   # adjust paths if needed
-   protoc \
-     --proto_path=proto \
-     --java_out=src \
-     --grpc-java_out=src \
-     proto/quantile_service.proto
-   ```
-
-3. **Verify** that generated `.java` files landed under `src/quantile/…`.
-
-4. **Install Clojure CLI** if not already (see https://clojure.org/guides/getting_started).
-
-### 9.3. Installation
-
-No separate “install” step is needed—Clojure CLI will pull dependencies on first run. If you want to pre‑fetch them:
-
-```bash
-clj -Stree      # shows dependency graph; pulls deps
-```
-
-### 9.4. Running the Service in Development
-
-#### 9.4.1 Start (HTTP + gRPC)
-
-```bash
-clj -A:run
-```
-
-You should see:
-
-```
-[mount] Starting ingest loop
-[mount] Starting HTTP server on port 8080
-[mount] Starting gRPC server on port 50051
-Quantile service running on HTTP:8080 and gRPC:50051
-```
-
-#### 9.4.2 Stop
-
-- **From the same terminal** → press `CTRL+C`
-- **From a Clojure REPL** (if you started via `clj` → `user=>`) :
-
-  ```clojure
-  (stop!)   ; stops mount states, HTTP & gRPC servers
-  ```
-
-#### 9.4.3 Restart
-
-- **REPL**:
-
-  ```clojure
-  (restart!)  ; stops, reloads namespaces, then (start!)
-  ```
-
-- **Terminal**:
-
-  ```bash
-  # after CTRL+C
-  clj -A:run
-  ```
-
-### 9.5. Testing Locally (Development)
-
-#### 9.5.1 HTTP Endpoints
-
-##### 9.5.1.1 Ingest a Sample
-
-```bash
-TIMESTAMP=$(date +%s)000
-curl -i -X POST http://localhost:8080/samples \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "key": "foo",
-    "value": 42.0,
-    "timestamp": '"$TIMESTAMP"'
-}'
-```
-
-**Expected HTTP 200** with JSON body, e.g.:
-
-```json
-{
-  "ack": true,
-  "ingestedAt": 1682001234567
-}
-```
-
-##### 9.5.1.2 Query a Quantile
-
-```bash
-curl -i -G http://localhost:8080/quantile \
-  --data-urlencode "key=foo" \
-  --data-urlencode "q=0.5" \
-  --data-urlencode "window=60"
-```
-
-**Possible responses**:
-
-- **200 OK** if data exists:
-
-  ```json
-  {
-    "estimate": {
-      "estimate": 42.0,
-      "count": 1
+    **Expected HTTP 200** with JSON body, e.g.:
+    ```json
+    {
+        "ack": true,
+        "ingestedAt": 1682001234567
     }
-  }
-  ```
+    ```
 
-- **404 Not Found** if key missing:
+    Query a Quantile:
+    ```bash
+    curl -i -G http://localhost:8080/quantile \
+    --data-urlencode "key=foo" \
+    --data-urlencode "q=0.5" \
+    --data-urlencode "window=60"
+    ```
 
-  ```json
-  { "error": "Key not found" }
-  ```
+    **Possible responses**:
 
-- **400 Bad Request** on invalid params:
+    - **200 OK** if data exists:
+        ```json
+        {
+            "estimate": {
+                "estimate": 42.0,
+                "count": 1
+            }
+        }
+        ```
 
-  ```json
-  { "error": "Missing key, q or window" }
-  ```
+    - **404 Not Found** if key missing:
+        ```json
+        { "error": "Key not found" }
+        ```
 
-#### 9.5.2 gRPC Endpoints
+    - **400 Bad Request** on invalid params:
+        ```json
+        { "error": "Missing key, q or window" }
+        ```
 
-Install [`grpcurl`](https://github.com/fullstorydev/grpcurl) or use any gRPC client.
+- **Test the gRPC** endpoints. Pay attention to the `-proto` flag, which needs to point to the correct path of the file and this depends on the current directory where you will execute the `grpcurl` command.  
 
-##### 9.5.2.1 IngestSample
+    Install [`grpcurl`](https://github.com/fullstorydev/grpcurl) or use any gRPC client.
 
-```bash
-grpcurl -plaintext \
-  -d '{
-    "key":       "foo",
-    "value":     42,
-    "timestamp": '"$TIMESTAMP"'
-  }' \
-  localhost:50051 quantile.QuantileService/IngestSample
-```
+    IngestSample:
+    ```bash
+    TIMESTAMP_MS=$(($(date +%s)*1000))
+    ```
+    ```bash
+    grpcurl -plaintext \
+        -proto pucpr-quantile-service/proto/quantile_service.proto \
+        -d '{"key":"foo","value":42.0,"timestamp":'"$TIMESTAMP_MS"'}' \
+        localhost:50051 \
+        quantile.QuantileService/IngestSample
+    ```
 
-**Response**:
+    **Response**:
+    ```json
+        { "success": true }
+    ```
 
-```json
-{ "success": true }
-```
+    QueryQuantile:
+    ```bash
+    grpcurl -plaintext \
+        -proto pucpr-quantile-service/proto/quantile_service.proto \
+        -d '{"key":"foo","q":0.5,"windowSec":60}' \
+        localhost:50051 \
+        quantile.QuantileService/QueryQuantile
+    ```
 
-##### 9.5.2.2 QueryQuantile
+    **Response**:
+    ```json
+    {
+        "estimate": 42.0,
+        "count": 1
+    }
+    ```
 
-```bash
-grpcurl -plaintext \
-  -d '{
-    "key":       "foo",
-    "q":         0.5,
-    "windowSec": 60
-  }' \
-  localhost:50051 quantile.QuantileService/QueryQuantile
-```
+### Production Environment
 
-**Response**:
+- **Build** the prod image:
+    ```bash
+    docker-compose build prod
+    ```
 
-```json
-{
-  "estimate": 42.0,
-  "count": 1
-}
-```
+- **Run** the container in prod mode:
+    ```bash
+    docker-compose up -d prod
+    ```
+    The application JAR file will be generated and should start the services on ports `8080` (HTTP) and `50051` (gRPC).
+    
+#### Testing Production Jar
 
-### 9.6. Production Build & Run
-
-#### 9.6.1 Build an Uberjar
-
-```bash
-# requires Clojure CLI and tools.build
-clj -T:build uber
-```
-
-This produces something like  
-`target/quantile-service-0.1.0.jar`
-
-#### 9.6.2 Run the Uberjar
-
-```bash
-java -jar target/quantile-service-0.1.0.jar
-```
-
-You’ll see the same Mount startup logs and servers on `:8080` (HTTP) and `:50051` (gRPC).
-
-Stop with **CTRL+C**.
-
-#### 9.6.3 Testing Production Jar
-
-Use **exactly the same** HTTP and gRPC commands from sections 5.1 and 5.2 to verify the running jar.
+Use **exactly the same** HTTP and gRPC commands from previuos sections to verify the running jar.
