@@ -1,0 +1,19 @@
+services:
+  dev:
+    build:
+      context: .
+      target: dev
+    volumes:
+      - ./:/app
+    ports:
+      - "8080:8080"           # REST
+      - "7000:7000"           # nREPL
+      - "50051:50051"         # gRPC
+
+  prod:
+    build:
+      context: .
+      target: prod
+    ports:
+      - "8080:8080"           # REST
+      - "50051:50051"         # gRPC
