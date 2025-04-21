@@ -1,0 +1,37 @@
+{:mvn/repos
+ {"central" {:url "https://repo1.maven.org/maven2/"}
+  "clojars" {:url "https://repo.clojars.org/"}}
+
+ :paths ["src" "resources"]
+
+ :deps
+ {org.clojure/clojure                   {:mvn/version "1.12.0"}
+  io.pedestal/pedestal.service          {:mvn/version "0.5.10"}
+  io.pedestal/pedestal.jetty            {:mvn/version "0.5.10"}
+  com.tdunning/t-digest                 {:mvn/version "3.2"}
+  com.clearspring.analytics/stream      {:mvn/version "2.9.8"}
+  mount/mount                           {:mvn/version "0.1.16"}
+  javax.servlet/javax.servlet-api       {:mvn/version "4.0.1"}
+  javax.annotation/javax.annotation-api {:mvn/version "1.3.2"}
+  io.grpc/grpc-netty-shaded             {:mvn/version "1.71.0"}
+  io.grpc/grpc-protobuf                 {:mvn/version "1.71.0"}
+  io.grpc/grpc-stub                     {:mvn/version "1.71.0"}
+  io.grpc/grpc-services                 {:mvn/version "1.71.0"}}
+
+ :aliases
+ {:dev  {:extra-deps   {org.clojure/tools.namespace {:mvn/version "1.3.0"}
+                       nrepl/nrepl               {:mvn/version "1.3.1"}
+                       cider/cider-nrepl         {:mvn/version "0.29.0"}}
+        :extra-paths  ["dev" "target/classes"]
+        :main-opts    ["-m" "nrepl.cmdline"
+                       "--interactive"
+                       "--middleware" "[cider.nrepl/cider-middleware]"
+                       "--port" "7000"]}
+
+  :run  {:main-opts ["-m" "quantile-service.core"]}
+
+  :test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}}
+
+
+  :build {:extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.8"}}
+          :ns-default   build}}}
