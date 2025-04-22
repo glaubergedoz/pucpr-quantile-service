@@ -1,0 +1,5 @@
+{:tests {:unit {:test-paths   ["test/quantile_service/unit"]
+                :source-paths ["src" "target/classes"]}
+         :integration {:test-paths   ["test/quantile_service/integration"]
+                       :source-paths ["src" "target/classes"]}}
+ :runner {:report {:stacktrace? true}}}

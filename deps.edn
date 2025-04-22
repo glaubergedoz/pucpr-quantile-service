@@ -2,7 +2,7 @@
  {"central" {:url "https://repo1.maven.org/maven2/"}
   "clojars" {:url "https://repo.clojars.org/"}}
 
- :paths ["src" "resources"]
+ :paths ["src" "resources" "test" "target/classes"]
 
  :deps
  {org.clojure/clojure                   {:mvn/version "1.12.0"}
@@ -16,7 +16,8 @@
   io.grpc/grpc-netty-shaded             {:mvn/version "1.71.0"}
   io.grpc/grpc-protobuf                 {:mvn/version "1.71.0"}
   io.grpc/grpc-stub                     {:mvn/version "1.71.0"}
-  io.grpc/grpc-services                 {:mvn/version "1.71.0"}}
+  io.grpc/grpc-services                 {:mvn/version "1.71.0"}
+  com.google.protobuf/protobuf-java     {:mvn/version "3.21.12"}}
 
  :aliases
  {:dev  {:extra-deps   {org.clojure/tools.namespace {:mvn/version "1.3.0"}
@@ -29,6 +30,17 @@
                        "--port" "7000"]}
 
   :run  {:main-opts ["-m" "quantile-service.core"]}
+
+  :kaocha {:extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}
+                        ring/ring-mock   {:mvn/version "0.4.0"}}
+           :extra-repos ["clojars"]
+           :main-opts  ["-m" "kaocha.runner"]}
+    
+  :kibit {:extra-deps  {jonase/kibit {:mvn/version "0.1.11"}}
+           :extra-repos ["clojars"]
+           :exec-fn     kibit.driver/exec
+           :exec-args   {:paths   ["src" "test"]
+                         :reporter "verbose"}}
 
   :test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}}
 
