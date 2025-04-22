@@ -106,13 +106,28 @@ message QuantileResponse {
 - **REPL helpers** in `dev/user.clj` (`start!`, `stop!`, `restart!`)  
 - **Error logging** via `clojure.spec/explain-str` in case of invalid samples  
 
+## 9. Quality Assurance
+
+### Tools & Benefits
+
+- **Kaocha**  
+  An advanced Clojure test runner that organizes unit, integration, load and end‑to‑end suites.  
+  - Readable reports, tag support, parallel execution, and optional coverage reporting via plugins (e.g. `kaocha-cloverage`).  
+  - Makes it easy to group and filter tests by type, ensuring each layer is validated in isolation.
+  - Documentation [here](https://github.com/lambdaisland/kaocha).
+
+- **Kibit**  
+  A static code analyzer for Clojure that suggests idiomatic refactorings and stylistic improvements.  
+  - Helps maintain consistent style and avoid common “code smells.”  
+  - Simple integration via `clj -X:kibit`, failing the build if any warnings are emitted.
+  - Documentatoin [here](https://github.com/clj-commons/kibit).
+
+### CI/CD Automation
+
+All lint checks and tests run automatically in the Docker/CI pipeline. Any failure in lint or tests immediately aborts the build.
 
 
-
-
-
-
-## 9. Usage Instructions
+## 10. Usage Instructions
 
 ### System Requirements
 
@@ -240,6 +255,21 @@ message QuantileResponse {
         "estimate": 42.0,
         "count": 1
     }
+    ```
+
+- Run the **linter**:
+    ```bash
+    clj -X:kibit
+    ```
+
+- Run the **unit tests**:
+    ```bash
+    clj -M:kaocha :unit
+    ```
+
+- Run the **integration tests**:
+    ```bash
+    clj -M:kaocha :integration
     ```
 
 ### Production Environment
