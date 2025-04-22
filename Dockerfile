@@ -40,9 +40,20 @@ RUN protoc \
       --grpc-java_out=src \
       proto/quantile_service.proto
 
-# Copy Clojure source code and resources
+RUN CLASSPATH=$(clj -Spath) \
+ && mkdir -p target/classes \
+ && find src -name '*.java' > java-sources.txt \
+ && javac -cp "$CLASSPATH" -d target/classes @java-sources.txt
+
+
+# Copy Clojure source code, tests and resources
 COPY src/       src/
 COPY resources/ resources/
+COPY test/ test/
+
+# Run linter and tests. This will fail the build if any test fails.
+RUN clj -X:kibit
+RUN clj -M:kaocha 
 
 # Generate uberjar with tools.build
 RUN clj -T:build clean
