@@ -48,7 +48,6 @@ RUN CLASSPATH=$(clj -Spath) \
 
 # Copy Clojure source code, tests and resources
 COPY src/       src/
-COPY resources/ resources/
 COPY test/ test/
 
 # Run linter and tests. This will fail the build if any test fails.
