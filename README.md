@@ -331,6 +331,7 @@ This project leverages **GitHub Actions** to automate both continuous integratio
 6. **Deployment**  
    - Uses the AWS CLI (configured via GitHub Secrets) to update the running service on AWS.  
    - Performs a rolling deployment so that new containers replace old ones without downtime.
+   - This stage requires a manual approval via a Github environment protection rule.
 
 All steps are configured to **fail fast**, ensuring only lint- and test-verified artifacts make it to production.
 
@@ -346,3 +347,10 @@ The service runs in a Kubernetes-managed environment on **Amazon EKS**, with ful
 
 This EKS-based setup ensures your quantile aggregation service is highly available, scalable, and continuously delivered from code push through to production without manual intervention.  
 
+## 13. Discord Alerts Pipeline
+
+This project includes a GitHub Actions workflow that sends real-time notifications to your Discord server for:
+
+- **Every commit** (push) to any branch  
+- **Every new pull request** opened  
+- **Every deployment awaiting manual approval** (via an Environment protection rule)
