@@ -223,7 +223,7 @@ All tests and lint checks run automatically in the Docker/CI pipeline. Any failu
             -d '{
                 "key": "foo",
                 "value": 42.0,
-                "timestamp": "$TIMESTAMP_MS"
+                "timestamp": '"$TIMESTAMP_MS"'
             }'
     ```
 
