@@ -18,12 +18,12 @@ jobs:
     # always run so we catch EVERY event above
     if: always()
     steps:
-      - name: Build notification payload
+            - name: Build notification payload
         id: payload
         run: |
           case "${GITHUB_EVENT_NAME}" in
             push)
-              msg="🚀 **Commit** by **${GITHUB_ACTOR}** on `${GITHUB_REF#refs/heads/}`  
+              msg="🚀 **Commit** by **${GITHUB_ACTOR}** on \`${GITHUB_REF#refs/heads/}\`  
               > ${{ github.event.head_commit.message }}  
               🔗 [Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${{ github.event.before }}...${{ github.sha }})"
               ;;
