@@ -24,15 +24,14 @@ jobs:
           case "${GITHUB_EVENT_NAME}" in
             push)
               msg="🚀 **Commit** by **${GITHUB_ACTOR}** on `${GITHUB_REF#refs/heads/}`  
-> ${{ github.event.head_commit.message }}  
+              > ${{ github.event.head_commit.message }}  
 🔗 [Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${{ github.event.before }}...${{ github.sha }})"
               ;;
             pull_request)
               pr=${{ github.event.pull_request.number }}
               title="${{ github.event.pull_request.title }}"
               url="${{ github.event.pull_request.html_url }}"
-              msg="👀 **New PR** #${pr} by **${GITHUB_ACTOR}**  
-> **${title}**  
+              msg="👀 **New PR** #${pr} by **${GITHUB_ACTOR}**  > **${title}**  
 🔗 [View PR](${url})"
               ;;
             deployment_status)
