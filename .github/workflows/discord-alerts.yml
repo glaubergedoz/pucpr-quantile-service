@@ -1,0 +1,58 @@
+name: "🚨 Discord Notifications"
+
+on:
+  # 1) Push to any branch (for every commit)
+  push:
+
+  # 2) New pull requests opened
+  pull_request:
+    types: [opened]
+
+  # 3) Deployment status created (for manual‐approval “environment” jobs)
+  deployment_status:
+    types: [created]
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+    # always run so we catch EVERY event above
+    if: always()
+    steps:
+      - name: Build notification payload
+        id: payload
+        run: |
+          case "${GITHUB_EVENT_NAME}" in
+            push)
+              msg="🚀 **Commit** by **${GITHUB_ACTOR}** on `${GITHUB_REF#refs/heads/}`  
+> ${{ github.event.head_commit.message }}  
+🔗 [Compare changes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${{ github.event.before }}...${{ github.sha }})"
+              ;;
+            pull_request)
+              pr=${{ github.event.pull_request.number }}
+              title="${{ github.event.pull_request.title }}"
+              url="${{ github.event.pull_request.html_url }}"
+              msg="👀 **New PR** #${pr} by **${GITHUB_ACTOR}**  
+> **${title}**  
+🔗 [View PR](${url})"
+              ;;
+            deployment_status)
+              env="${{ github.event.deployment.environment }}"
+              url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              msg="⏳ **Deployment to environment ‘${env}’** is **pending approval**  
+🔗 [Approve in Actions](${url})"
+              ;;
+            *)
+              msg="ℹ️ Unhandled event: ${GITHUB_EVENT_NAME}"
+              ;;
+          esac
+          # wrap in JSON
+          jq -Rn --arg c "$msg" '{content: $c}' > payload.json
+
+      - name: Send Discord notification
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               --data @payload.json \
+               "$WEBHOOK_URL"
