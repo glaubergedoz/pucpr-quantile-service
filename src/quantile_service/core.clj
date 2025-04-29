@@ -10,6 +10,7 @@
   (:import (com.tdunning.math.stats TDigest)
            (com.clearspring.analytics.stream.frequency CountMinSketch)
            (io.grpc ServerBuilder)
+           (io.grpc ServerBuilder Status) 
            (io.grpc.protobuf.services ProtoReflectionService)
            [quantile QuantileServiceGrpc$QuantileServiceImplBase
             Sample QuantileRequest QuantileResponse Ack]))
@@ -73,11 +74,41 @@
      :count     total}))
 
 ;; -------------------- Handlers --------------------
-(defn ingest-handler [{:keys [json-params]}]
-  (>!! sample-chan json-params)
-  {:status 200
-   :body   {:ack        true
-            :ingestedAt (System/currentTimeMillis)}})
+(defn ingest-handler
+  [{:keys [json-params]}]
+  (try
+    (let [{:keys [key value timestamp]} json-params
+          v (cond
+              (number? value)           value
+              (string? value)           (Double/parseDouble (str value))
+              :else (throw (IllegalArgumentException.
+                             "Field `value` must be a number or numeric string")))
+          ts (cond
+               (number? timestamp)      (long timestamp)
+               (string? timestamp)      (Long/parseLong (str timestamp))
+               :else (throw (IllegalArgumentException.
+                              "Field `timestamp` must be a number or numeric string")))
+          sample {:key       key
+                  :value     v
+                  :timestamp ts}]
+      (>!! sample-chan sample)
+      {:status 200
+       :body   {:ack        true
+                :ingestedAt ts}})
+    (catch NumberFormatException e
+      (println "[ingest-handler] format error:" (.getMessage e) "payload=" json-params)
+      {:status 400
+       :body   {:error   "value or timestamp is not a valid number"
+                :details (.getMessage e)}})
+    (catch IllegalArgumentException e
+      (println "[ingest-handler] invalid input:" (.getMessage e) "payload=" json-params)
+      {:status 400
+       :body   {:error (.getMessage e)}})
+    (catch Exception e
+      (println "[ingest-handler] unexpected error:" (.getMessage e) "payload=" json-params)
+      {:status 500
+       :body   {:error   "Internal server error"
+                :details (.getMessage e)}})))
 
 (defn query-handler [{:keys [query-params]}]
   (try
@@ -133,17 +164,29 @@
     (println "[mount] Starting gRPC server on port 50051")
     (let [service-impl
           (proxy [QuantileServiceGrpc$QuantileServiceImplBase] []
+
             ;; IngestSample RPC
             (ingestSample [^Sample req ^io.grpc.stub.StreamObserver obs]
-              (let [sample   {:key       (.getKey req)
-                              :value     (.getValue req)
-                              :timestamp (.getTimestamp req)}
-                    response (-> (Ack/newBuilder)
-                                 (.setSuccess true)
-                                 .build)]
-                (>!! sample-chan sample)
-                (.onNext obs response)
-                (.onCompleted obs)))
+              (try
+                (let [k           (.getKey   req)
+                      v           (.getValue req)
+                      server-ts   (System/currentTimeMillis)
+                      sample      {:key       k
+                                  :value     v
+                                  :timestamp server-ts}]
+                  (swap! states update k add-sample->state sample)
+                  (let [response (-> (Ack/newBuilder)
+                                    (.setSuccess true)
+                                    .build)]
+                    (.onNext     obs response)
+                    (.onCompleted obs)))
+                (catch Exception e
+                  (println "[gRPC ingestSample] error:" (.getMessage e))
+                  (.onError obs
+                    (.asRuntimeException
+                      (.withDescription Status/INTERNAL
+                                        "Internal server error")
+                      e)))))
 
             ;; QueryQuantile RPC
             (queryQuantile [^QuantileRequest req ^io.grpc.stub.StreamObserver obs]
@@ -152,14 +195,23 @@
                     windowSec (.getWindowSec req)
                     state     (get @states key)]
                 (if state
-                  (let [{:keys [estimate count]} (estimate-quantile state q windowSec)
-                        response                  (-> (QuantileResponse/newBuilder)
-                                                      (.setEstimate estimate)
-                                                      (.setCount     count)
-                                                      .build)]
-                    (.onNext obs response)
-                    (.onCompleted obs))
-                  (.onError obs (IllegalArgumentException. "Key not found"))))))]
+                  (let [events      (:events state)
+                        now         (System/currentTimeMillis)
+                        cutoff      (- now (* windowSec 1000))
+                        relevant    (filter #(>= (:timestamp %) cutoff) events)
+                        total-all   (count events)
+                        total-rel   (count relevant)]
+                    (let [{:keys [estimate count]} (estimate-quantile state q windowSec)
+                          response                  (-> (QuantileResponse/newBuilder)
+                                                        (.setEstimate estimate)
+                                                        (.setCount     count)
+                                                        .build)]
+                      (.onNext obs response)
+                      (.onCompleted obs)))
+                  (.onError obs
+                    (.asRuntimeException
+                      (.withDescription Status/NOT_FOUND
+                                        "Key not found")))))))]
 
       (doto (-> (ServerBuilder/forPort 50051)
                 (.addService service-impl)
