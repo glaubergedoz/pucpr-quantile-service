@@ -18,7 +18,7 @@ jobs:
     # always run so we catch EVERY event above
     if: always()
     steps:
-            - name: Build notification payload
+      - name: Build notification payload
         id: payload
         run: |
           case "${GITHUB_EVENT_NAME}" in
