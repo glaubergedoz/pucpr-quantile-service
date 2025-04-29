@@ -124,7 +124,7 @@ message QuantileResponse {
 
 ### CI/CD Automation
 
-All lint checks and tests run automatically in the Docker/CI pipeline. Any failure in lint or tests immediately aborts the build.
+All tests and lint checks run automatically in the Docker/CI pipeline. Any failure in lint or tests immediately aborts the build.
 
 
 ## 10. Usage Instructions
@@ -135,11 +135,39 @@ All lint checks and tests run automatically in the Docker/CI pipeline. Any failu
 - **Docker Compose**
 - `git` (optional, for cloning the repo)
 
+
+### Basic Usage (Local Production Environment)
+
+- **Clone the repo** (or unpack the project folder).
+    ```bash
+    git clone https://your‑repo/pucpr-quantile‑service.git
+    ```
+- **Access the project root folder**
+    ```bash
+    cd pucpr-quantile‑service
+    ```
+
+- **Build** the prod image:
+    ```bash
+    docker compose build --no-cache prod
+    ```
+
+- **Run** the container in prod mode:
+    ```bash
+    docker compose up -d prod
+    ```
+    **That's it!!** 🚀🚀🚀  
+    The application JAR file will be generated and should start the services on ports `8080` (HTTP) and `50051` (gRPC).  
+    Now, you can [test the endpoints](#testing-the-endpoints).
+
 ### Development Environment Setup
 
 - **Clone the repo** (or unpack the project folder).
     ```bash
     git clone https://your‑repo/pucpr-quantile‑service.git
+    ```
+- Access the **project root folder**
+    ```bash
     cd pucpr-quantile‑service
     ```
 - **Build** the dev container.
@@ -163,21 +191,39 @@ All lint checks and tests run automatically in the Docker/CI pipeline. Any failu
     Quantile service running on HTTP:8080 and gRPC:50051
     ```
     **That's it!**   
-    The endpoints should be available on ports 8080 (HTTP) e 50051 (gRPC).
+    The endpoints should be available on ports 8080 (HTTP) e 50051 (gRPC).  
+    Now, you can [test the endpoints](#testing-the-endpoints).
 
-- **Test the HTTP** endpoints.  
+- Run the **linter**:
+    ```bash
+    clj -X:kibit
+    ```
+
+- Run the **unit tests**:
+    ```bash
+    clj -M:kaocha :unit
+    ```
+
+- Run the **integration tests**:
+    ```bash
+    clj -M:kaocha :integration
+    ```
+
+### Using the Endpoints
+
+- **HTTP Endpoints**  
     
     Ingest a sample:
     ```bash
     TIMESTAMP_MS=$(($(date +%s)*1000))
     ```
     ```bash
-    curl -i -X POST http://localhost:8080/samples \
+    curl -X POST http://localhost:8080/samples \
             -H 'Content-Type: application/json' \
             -d '{
                 "key": "foo",
                 "value": 42.0,
-                "timestamp": '"$TIMESTAMP"'
+                "timestamp": "$TIMESTAMP_MS"
             }'
     ```
 
@@ -219,9 +265,10 @@ All lint checks and tests run automatically in the Docker/CI pipeline. Any failu
         { "error": "Missing key, q or window" }
         ```
 
-- **Test the gRPC** endpoints. Pay attention to the `-proto` flag, which needs to point to the correct path of the file and this depends on the current directory where you will execute the `grpcurl` command.  
+- **gRPC Services**  
+    Pay attention to the `-proto` flag, which needs to point to the correct path of the file and this depends on the current directory where you will execute the `grpcurl` command.  
 
-    Install [`grpcurl`](https://github.com/fullstorydev/grpcurl) or use any gRPC client.
+    Install [`grpcurl`](https://github.com/fullstorydev/grpcurl) or use any other gRPC client.
 
     IngestSample:
     ```bash
@@ -229,7 +276,7 @@ All lint checks and tests run automatically in the Docker/CI pipeline. Any failu
     ```
     ```bash
     grpcurl -plaintext \
-        -proto pucpr-quantile-service/proto/quantile_service.proto \
+        -proto proto/quantile_service.proto \
         -d '{"key":"foo","value":42.0,"timestamp":'"$TIMESTAMP_MS"'}' \
         localhost:50051 \
         quantile.QuantileService/IngestSample
@@ -243,7 +290,7 @@ All lint checks and tests run automatically in the Docker/CI pipeline. Any failu
     QueryQuantile:
     ```bash
     grpcurl -plaintext \
-        -proto pucpr-quantile-service/proto/quantile_service.proto \
+        -proto proto/quantile_service.proto \
         -d '{"key":"foo","q":0.5,"windowSec":60}' \
         localhost:50051 \
         quantile.QuantileService/QueryQuantile
@@ -257,34 +304,45 @@ All lint checks and tests run automatically in the Docker/CI pipeline. Any failu
     }
     ```
 
-- Run the **linter**:
-    ```bash
-    clj -X:kibit
-    ```
 
-- Run the **unit tests**:
-    ```bash
-    clj -M:kaocha :unit
-    ```
+## 11. CI/CD Pipeline
 
-- Run the **integration tests**:
-    ```bash
-    clj -M:kaocha :integration
-    ```
+This project leverages **GitHub Actions** to automate both continuous integration and continuous deployment. The workflow is defined in `.github/workflows/ci-cd.yml` and includes the following stages:
 
-### Production Environment
+1. **Checkout & Setup**  
+   - Checks out the repository.  
+   - Installs JDK 19 and the Clojure CLI.
 
-- **Build** the prod image:
-    ```bash
-    docker-compose build prod
-    ```
+2. **Linting**  
+   - Runs `clj -X:kibit` to enforce idiomatic Clojure and fails the build on any warnings.
 
-- **Run** the container in prod mode:
-    ```bash
-    docker-compose up -d prod
-    ```
-    The application JAR file will be generated and should start the services on ports `8080` (HTTP) and `50051` (gRPC).
-    
-#### Testing Production Jar
+3. **Testing**  
+   - Executes the full Kaocha test suite (unit, integration, load, and end-to-end) inside the Docker **builder** stage.  
+   - Aborts immediately if any test fails.
 
-Use **exactly the same** HTTP and gRPC commands from previuos sections to verify the running jar.
+4. **Docker Build**  
+   - Builds a multi-stage Docker image using the provided `Dockerfile`.  
+   - **Base** stage installs dependencies and tools; **builder** stage compiles and generates the uberjar; **prod** stage produces a lean runtime image with just the JRE and the jar.
+
+5. **Image Tag & Push**  
+   - Tags the image with the Git commit SHA (e.g. `quantile-service:${{ github.sha }}`).  
+   - Pushes the image to Docker Hub registry.
+
+6. **Deployment**  
+   - Uses the AWS CLI (configured via GitHub Secrets) to update the running service on AWS.  
+   - Performs a rolling deployment so that new containers replace old ones without downtime.
+
+All steps are configured to **fail fast**, ensuring only lint- and test-verified artifacts make it to production.
+
+## 12. Production Environment on AWS (EKS)
+
+The service runs in a Kubernetes-managed environment on **Amazon EKS**, with fully automated deployments via GitHub Actions.
+
+  - Deployed into a dedicated VPC across multiple Availability Zones for high availability.  
+  - Uses managed node groups to run pods.  
+  - Ingress traffic is handled by a Kubernetes Ingress, routing HTTP (port 8080) and gRPC (port 50051) requests to the `quantile-service` Deployment.
+  - IAM permissions for the service account are scoped via an AWS IAM Role for Service Accounts (IRSA) to limit access to only required AWS resources.
+
+
+This EKS-based setup ensures your quantile aggregation service is highly available, scalable, and continuously delivered from code push through to production without manual intervention.  
+
